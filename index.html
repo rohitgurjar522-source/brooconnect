@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Broo Connect - Auto Pilot Earning</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Chakra+Petch:wght@400;500;600;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Chakra Petch', sans-serif;
+        background-color: #050505;
+        color: #e2e8f0;
+        margin: 0;
+      }
+      h1, h2, h3, h4, h5, h6, .brand-font {
+        font-family: 'Russo One', sans-serif;
+        letter-spacing: 0.05em;
+      }
+      .gold-text {
+        color: #FFD700;
+        text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+      }
+      .btn-gaming {
+        background: linear-gradient(180deg, #FFB800 0%, #FF8A00 100%);
+        box-shadow: 0px 4px 0px #9E5600;
+        transition: all 0.1s;
+      }
+      .btn-gaming:active {
+        transform: translateY(2px);
+        box-shadow: 0px 2px 0px #9E5600;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.3s ease-out forwards;
+      }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@2.45.4"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    
+    <!-- MSG91 OTP Integration -->
+    <script type="text/javascript">
+      window.msg91Config = {
+        widgetId: "356c7771484e393738393731",
+        tokenAuth: "483852Tm7V0MKK694ad662P1",
+        exposeMethods: true,
+        success: function (data) {
+          console.log("OTP VERIFIED SUCCESS:", data);
+          window.dispatchEvent(new CustomEvent("otp-verified", { detail: data }));
+        },
+        failure: function (error) {
+          console.error("OTP ERROR DETAILS:", JSON.stringify(error));
+          // Emit a custom event so the React UI can catch the stringified error
+          window.dispatchEvent(new CustomEvent("otp-error", { detail: JSON.stringify(error) }));
+        }
+      };
+
+      (function () {
+        var s = document.createElement("script");
+        s.src = "https://verify.msg91.com/otp-provider.js";
+        s.async = true;
+        s.onload = function () {
+          if (window.initSendOTP) {
+            window.initSendOTP(window.msg91Config);
+          }
+        };
+        document.body.appendChild(s);
+      })();
+    </script>
+
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
