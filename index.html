@@ -37,6 +37,15 @@
       .animate-fade-in {
         animation: fadeIn 0.3s ease-out forwards;
       }
+      /* Hide scrollbar for Chrome, Safari and Opera */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      /* Hide scrollbar for IE, Edge and Firefox */
+      .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+      }
     </style>
     <script type="importmap">
 {
@@ -53,37 +62,6 @@
 </head>
   <body>
     <div id="root"></div>
-    
-    <!-- MSG91 OTP Integration -->
-    <script type="text/javascript">
-      window.msg91Config = {
-        widgetId: "356c7771484e393738393731",
-        tokenAuth: "483852Tm7V0MKK694ad662P1",
-        exposeMethods: true,
-        success: function (data) {
-          console.log("OTP VERIFIED SUCCESS:", data);
-          window.dispatchEvent(new CustomEvent("otp-verified", { detail: data }));
-        },
-        failure: function (error) {
-          console.error("OTP ERROR DETAILS:", JSON.stringify(error));
-          // Emit a custom event so the React UI can catch the stringified error
-          window.dispatchEvent(new CustomEvent("otp-error", { detail: JSON.stringify(error) }));
-        }
-      };
-
-      (function () {
-        var s = document.createElement("script");
-        s.src = "https://verify.msg91.com/otp-provider.js";
-        s.async = true;
-        s.onload = function () {
-          if (window.initSendOTP) {
-            window.initSendOTP(window.msg91Config);
-          }
-        };
-        document.body.appendChild(s);
-      })();
-    </script>
-
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
