@@ -70,10 +70,10 @@ export default function Auth() {
     setError("");
 
     try {
-      const res = await fetch("/api/otp", {
+      const res = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send", mobile })
+        body: JSON.stringify({ mobile })
       });
 
       const data = await res.json();
@@ -98,10 +98,10 @@ export default function Auth() {
     setError("");
 
     try {
-      const res = await fetch("/api/otp", {
+      const res = await fetch("/api/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify", mobile, otp })
+        body: JSON.stringify({ mobile, otp })
       });
 
       const data = await res.json();
