@@ -22,7 +22,7 @@ export default function Auth() {
     try {
       const dbMobile = "91" + mobile;
 
-      // First check if user exists by mobile
+      // Check for existing user
       let { data: user, error: fetchError } = await supabase
         .from('users')
         .select('*')
@@ -32,7 +32,7 @@ export default function Auth() {
       if (fetchError) throw fetchError;
 
       if (!user) {
-        // Create new user if they don't exist
+        // Create new profile for first-time login
         const referralCode = "BR" + Math.floor(1000 + Math.random() * 9000);
         const { data: newUser, error: insertError } = await supabase
           .from('users')
@@ -58,18 +58,18 @@ export default function Auth() {
         localStorage.setItem('broo_user', JSON.stringify(user));
         window.location.reload();
       } else {
-        throw new Error("Failed to initialize user session");
+        throw new Error("Session initialization failed");
       }
     } catch (err: any) {
       console.error("Auth Finalize Error:", err);
-      setError("Account sync failed. Please contact support.");
+      setError("Account sync failed. Please try again.");
       setLoading(false);
     }
   };
 
   const handleSendOtp = async () => {
     if (!mobile || mobile.length < 10) {
-      setError("Enter a valid 10-digit mobile number");
+      setError("Enter a valid 10-digit number");
       return;
     }
 
@@ -85,7 +85,6 @@ export default function Auth() {
 
       const data = await res.json();
       
-      // MSG91 returns type: "success" or "error"
       if (data.type === "success") {
         setStep("otp");
         setTimer(30);
@@ -93,7 +92,7 @@ export default function Auth() {
         throw new Error(data.message || "Failed to deliver OTP");
       }
     } catch (err: any) {
-      setError(err.message || "Failed to reach server");
+      setError(err.message || "OTP delivery failed");
     } finally {
       setLoading(false);
     }
@@ -120,10 +119,10 @@ export default function Auth() {
       if (data.type === "success") {
         await finalizeAuth();
       } else {
-        throw new Error(data.message || "Incorrect verification code");
+        throw new Error(data.message || "Invalid OTP code");
       }
     } catch (err: any) {
-      setError(err.message || "OTP verification failed. Please retry.");
+      setError(err.message || "OTP verification failed");
       setLoading(false);
     }
   };
@@ -144,7 +143,7 @@ export default function Auth() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-600/5 rounded-full blur-3xl"></div>
           
           <h2 className="text-white text-xl font-black mb-8 text-center uppercase tracking-tight flex items-center justify-center gap-2">
-            {step === "mobile" ? <><ShieldCheck size={20} className="text-yellow-500"/> LOGIN</> : <><Smartphone size={20} className="text-yellow-500"/> VERIFY</>}
+            {step === "mobile" ? <><ShieldCheck size={20} className="text-yellow-500"/> SECURE LOGIN</> : <><Smartphone size={20} className="text-yellow-500"/> VERIFY ACCESS</>}
           </h2>
 
           <div className="space-y-6">
@@ -167,7 +166,7 @@ export default function Auth() {
                 </div>
                 
                 <p className="text-center text-[10px] text-gray-500 font-medium uppercase tracking-wider leading-relaxed">
-                  Fast, secure, and password-less login via OTP.
+                  A verification code will be sent to your mobile.
                 </p>
 
                 <button 
@@ -178,7 +177,7 @@ export default function Auth() {
                   {loading ? (
                     <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                   ) : (
-                    <>SEND OTP NOW <Smartphone size={18}/></>
+                    <>SEND OTP <Smartphone size={18}/></>
                   )}
                 </button>
               </>
@@ -190,7 +189,7 @@ export default function Auth() {
                   </div>
                   <input 
                     type="text" 
-                    placeholder="Enter 6-Digit Code" 
+                    placeholder="Enter Code" 
                     maxLength={6}
                     autoFocus
                     className="w-full bg-black/50 border border-gray-800 rounded-2xl py-4 pl-14 pr-4 text-white outline-none focus:border-yellow-600 transition-all font-bold tracking-[0.5em] text-xl text-center" 
@@ -201,7 +200,7 @@ export default function Auth() {
                 </div>
 
                 <div className="text-center">
-                  <p className="text-xs text-gray-500 mb-2">Code sent to <span className="text-white font-bold">+91 {mobile}</span></p>
+                  <p className="text-xs text-gray-500 mb-2">Sent to <span className="text-white font-bold">+91 {mobile}</span></p>
                   <div className="flex justify-center gap-4">
                     <button onClick={() => { setStep("mobile"); setOtp(""); setError(""); }} className="text-[10px] text-gray-500 font-bold uppercase hover:text-white flex items-center gap-1">
                       <ArrowLeft size={10} /> Edit Number
@@ -211,7 +210,7 @@ export default function Auth() {
                       disabled={timer > 0 || loading}
                       className={`text-[10px] font-bold uppercase flex items-center gap-1 ${timer > 0 ? 'text-gray-700 cursor-not-allowed' : 'text-yellow-600 hover:text-yellow-400'}`}
                     >
-                      <Clock size={10} /> {timer > 0 ? `Resend in ${timer}s` : 'Resend Code'}
+                      <Clock size={10} /> {timer > 0 ? `Resend in ${timer}s` : 'Resend Now'}
                     </button>
                   </div>
                 </div>
@@ -242,14 +241,14 @@ export default function Auth() {
                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Gateway: BROOCT-SECURE</span>
                </div>
                <p className="text-[8px] text-gray-600 leading-relaxed max-w-[240px] mx-auto uppercase">
-                 System secured via enterprise-grade encryption.
+                 Login secure via enterprise encryption.
                </p>
             </div>
           </div>
         </div>
 
         <div className="mt-8 text-center text-[9px] text-gray-800 font-bold tracking-[0.3em] uppercase opacity-40">
-          Broo Connect • Production Auth v3.2
+          Broo Connect • Secure Auth v3.3
         </div>
       </div>
     </div>
