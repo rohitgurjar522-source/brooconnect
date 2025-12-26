@@ -5,10 +5,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { mobile } = req.body;
+  const { phone } = req.body;
 
-  if (!mobile || mobile.length !== 10) {
-    return res.status(400).json({ error: "Invalid mobile number" });
+  if (!phone) {
+    return res.status(400).json({ error: "Phone number required" });
   }
 
   try {
@@ -16,24 +16,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "authkey": process.env.VITE_MSG91_AUTH_KEY as string,
+        "authkey": (process.env.MSG91_AUTH_KEY || process.env.VITE_MSG91_AUTH_KEY) as string
       },
       body: JSON.stringify({
-        template_id: process.env.VITE_MSG91_TEMPLATE_ID,
-        mobile: `91${mobile}`,
-        sender: process.env.VITE_MSG91_SENDER_ID || "BROOCT",
-      }),
+        template_id: process.env.MSG91_TEMPLATE_ID || process.env.VITE_MSG91_TEMPLATE_ID,
+        mobile: phone,
+        sender: process.env.MSG91_SENDER_ID || process.env.VITE_MSG91_SENDER_ID || "BROOCT"
+      })
     });
 
     const data = await response.json();
-
-    if (data.type === "error") {
-      return res.status(400).json({ error: data.message });
-    }
-
-    return res.status(200).json({ success: true });
+    return res.status(200).json(data);
   } catch (err) {
     console.error("Server Send Error:", err);
-    return res.status(500).json({ error: "OTP send failed" });
+    return res.status(500).json({ type: "error", message: "OTP send failed" });
   }
 }
