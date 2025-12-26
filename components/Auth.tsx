@@ -22,6 +22,7 @@ export default function Auth() {
     try {
       const dbMobile = "91" + mobile;
 
+      // First check if user exists by mobile
       let { data: user, error: fetchError } = await supabase
         .from('users')
         .select('*')
@@ -31,6 +32,7 @@ export default function Auth() {
       if (fetchError) throw fetchError;
 
       if (!user) {
+        // Create new user if they don't exist
         const referralCode = "BR" + Math.floor(1000 + Math.random() * 9000);
         const { data: newUser, error: insertError } = await supabase
           .from('users')
@@ -52,10 +54,15 @@ export default function Auth() {
         user = newUser;
       }
 
-      localStorage.setItem('broo_user', JSON.stringify(user));
-      window.location.reload();
+      if (user) {
+        localStorage.setItem('broo_user', JSON.stringify(user));
+        window.location.reload();
+      } else {
+        throw new Error("Failed to initialize user session");
+      }
     } catch (err: any) {
-      setError("Account synchronization failed. Please refresh.");
+      console.error("Auth Finalize Error:", err);
+      setError("Account sync failed. Please contact support.");
       setLoading(false);
     }
   };
@@ -77,12 +84,16 @@ export default function Auth() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to deliver OTP");
-
-      setStep("otp");
-      setTimer(30);
+      
+      // MSG91 returns type: "success" or "error"
+      if (data.type === "success") {
+        setStep("otp");
+        setTimer(30);
+      } else {
+        throw new Error(data.message || "Failed to deliver OTP");
+      }
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to reach server");
     } finally {
       setLoading(false);
     }
@@ -90,7 +101,7 @@ export default function Auth() {
 
   const handleVerifyOtp = async () => {
     if (!otp || otp.length < 4) {
-      setError("Please enter the 6-digit code");
+      setError("Please enter the verification code");
       return;
     }
 
@@ -105,11 +116,14 @@ export default function Auth() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Incorrect verification code");
-
-      await finalizeAuth();
+      
+      if (data.type === "success") {
+        await finalizeAuth();
+      } else {
+        throw new Error(data.message || "Incorrect verification code");
+      }
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "OTP verification failed. Please retry.");
       setLoading(false);
     }
   };
@@ -153,7 +167,7 @@ export default function Auth() {
                 </div>
                 
                 <p className="text-center text-[10px] text-gray-500 font-medium uppercase tracking-wider leading-relaxed">
-                  A verification code will be sent to your number.
+                  Fast, secure, and password-less login via OTP.
                 </p>
 
                 <button 
@@ -164,7 +178,7 @@ export default function Auth() {
                   {loading ? (
                     <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                   ) : (
-                    <>GET OTP <Smartphone size={18}/></>
+                    <>SEND OTP NOW <Smartphone size={18}/></>
                   )}
                 </button>
               </>
@@ -176,7 +190,7 @@ export default function Auth() {
                   </div>
                   <input 
                     type="text" 
-                    placeholder="Enter Code" 
+                    placeholder="Enter 6-Digit Code" 
                     maxLength={6}
                     autoFocus
                     className="w-full bg-black/50 border border-gray-800 rounded-2xl py-4 pl-14 pr-4 text-white outline-none focus:border-yellow-600 transition-all font-bold tracking-[0.5em] text-xl text-center" 
@@ -190,14 +204,14 @@ export default function Auth() {
                   <p className="text-xs text-gray-500 mb-2">Code sent to <span className="text-white font-bold">+91 {mobile}</span></p>
                   <div className="flex justify-center gap-4">
                     <button onClick={() => { setStep("mobile"); setOtp(""); setError(""); }} className="text-[10px] text-gray-500 font-bold uppercase hover:text-white flex items-center gap-1">
-                      <ArrowLeft size={10} /> Edit
+                      <ArrowLeft size={10} /> Edit Number
                     </button>
                     <button 
                       onClick={handleSendOtp} 
                       disabled={timer > 0 || loading}
                       className={`text-[10px] font-bold uppercase flex items-center gap-1 ${timer > 0 ? 'text-gray-700 cursor-not-allowed' : 'text-yellow-600 hover:text-yellow-400'}`}
                     >
-                      <Clock size={10} /> {timer > 0 ? `${timer}s` : 'Resend'}
+                      <Clock size={10} /> {timer > 0 ? `Resend in ${timer}s` : 'Resend Code'}
                     </button>
                   </div>
                 </div>
@@ -205,12 +219,12 @@ export default function Auth() {
                 <button 
                   onClick={handleVerifyOtp} 
                   disabled={loading} 
-                  className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase tracking-wider active:scale-95 transition-all text-sm flex items-center justify-center gap-2 shadow-[0_10px_20px_rgba(234,179,8,0.2)]"
+                  className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase tracking-wider active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
                 >
                   {loading ? (
                     <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                   ) : (
-                    <>VERIFY CODE</>
+                    <>CONFIRM & ENTER</>
                   )}
                 </button>
               </>
@@ -225,17 +239,17 @@ export default function Auth() {
             <div className="pt-6 text-center border-t border-gray-800/50">
                <div className="flex items-center justify-center gap-2 mb-2">
                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                 <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Secure Gateway Active</span>
+                 <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Gateway: BROOCT-SECURE</span>
                </div>
                <p className="text-[8px] text-gray-600 leading-relaxed max-w-[240px] mx-auto uppercase">
-                 System secured by enterprise-grade encryption.
+                 System secured via enterprise-grade encryption.
                </p>
             </div>
           </div>
         </div>
 
         <div className="mt-8 text-center text-[9px] text-gray-800 font-bold tracking-[0.3em] uppercase opacity-40">
-          Broo Connect • Secure Auth v3.1
+          Broo Connect • Production Auth v3.2
         </div>
       </div>
     </div>
