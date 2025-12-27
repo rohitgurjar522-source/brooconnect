@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { Settings, Grid, PlayCircle, PlusSquare, Camera, Edit, LogOut } from './Icons';
+import { Settings, Grid, PlayCircle, PlusSquare, Camera, Edit, LogOut, Lock, Key, ChevronRight, Smartphone } from './Icons';
 
 interface ProfileProps {
   user: User;
@@ -9,16 +9,44 @@ interface ProfileProps {
 
 const Profile: React.FC<ProfileProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<'posts' | 'reels'>('reels');
+  const [isChangingPin, setIsChangingPin] = useState(false);
+  const [oldPin, setOldPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleUpload = () => {
-    // Simulation of upload functionality
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'video/*,image/*';
     input.onchange = (e) => {
-      alert("Opening Camera/Gallery... Video selected for upload!");
+      alert("Opening Camera/Gallery... Content processing...");
     };
     input.click();
+  };
+
+  const updatePin = async () => {
+    if (!oldPin || !newPin) return alert("All fields required");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/change-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, oldPin, newPin })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("PIN updated successfully!");
+        setIsChangingPin(false);
+        setOldPin("");
+        setNewPin("");
+      } else {
+        alert(data.message);
+      }
+    } catch (err) {
+      alert("Failed to update PIN");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,7 +79,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onLogout }) => {
          
          <div className="flex-1 flex justify-around text-center">
             <div>
-               <h4 className="text-white font-bold text-lg">{user.posts || 12}</h4>
+               <h4 className="text-white font-bold text-lg">{user.posts || 0}</h4>
                <p className="text-gray-500 text-xs">Posts</p>
             </div>
             <div>
@@ -77,6 +105,66 @@ const Profile: React.FC<ProfileProps> = ({ user, onLogout }) => {
          </div>
       </div>
 
+      {/* Security Section */}
+      <div className="mb-6">
+         <h3 className="text-gray-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-3 px-1">SECURITY SETTINGS</h3>
+         <div className="bg-[#111] border border-gray-800 rounded-2xl overflow-hidden">
+            {!isChangingPin ? (
+               <button 
+                  onClick={() => setIsChangingPin(true)}
+                  className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+               >
+                  <div className="flex items-center gap-4">
+                     <div className="w-10 h-10 rounded-xl bg-yellow-900/20 flex items-center justify-center text-yellow-500 border border-yellow-500/20">
+                        <Key size={18} />
+                     </div>
+                     <div className="text-left">
+                        <h4 className="text-white font-bold text-sm">Change Security PIN</h4>
+                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Update your 4-6 digit numeric code</p>
+                     </div>
+                  </div>
+                  <ChevronRight size={18} className="text-gray-700" />
+               </button>
+            ) : (
+               <div className="p-5 space-y-4 animate-fade-in">
+                  <div className="flex justify-between items-center mb-2">
+                     <h4 className="text-yellow-500 font-bold text-sm uppercase italic">Update PIN</h4>
+                     <button onClick={() => setIsChangingPin(false)} className="text-xs text-gray-500 hover:text-white uppercase font-bold">Cancel</button>
+                  </div>
+                  <div className="space-y-3">
+                     <div className="bg-black border border-gray-800 rounded-xl p-3 flex items-center gap-3">
+                        <Lock size={16} className="text-gray-600" />
+                        <input 
+                           type="password" 
+                           placeholder="Current PIN" 
+                           className="bg-transparent w-full text-white outline-none text-sm font-bold"
+                           value={oldPin}
+                           onChange={e => setOldPin(e.target.value)}
+                        />
+                     </div>
+                     <div className="bg-black border border-gray-800 rounded-xl p-3 flex items-center gap-3">
+                        <Smartphone size={16} className="text-gray-600" />
+                        <input 
+                           type="password" 
+                           placeholder="New 4-6 Digit PIN" 
+                           className="bg-transparent w-full text-white outline-none text-sm font-bold"
+                           value={newPin}
+                           onChange={e => setNewPin(e.target.value)}
+                        />
+                     </div>
+                     <button 
+                        onClick={updatePin}
+                        disabled={loading}
+                        className="w-full btn-gaming py-3 rounded-xl text-black font-black uppercase text-xs tracking-wider transition-all active:scale-95 shadow-lg"
+                     >
+                        {loading ? 'Processing...' : 'CONFIRM CHANGE'}
+                     </button>
+                  </div>
+               </div>
+            )}
+         </div>
+      </div>
+
       {/* Upload Feature Highlight */}
       <div className="mb-6 p-4 bg-yellow-900/10 border border-yellow-600/30 rounded-xl flex items-center justify-between">
          <div className="flex items-center gap-3">
@@ -85,7 +173,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onLogout }) => {
              </div>
              <div>
                 <h4 className="text-white text-sm font-bold">Upload Your Feel</h4>
-                <p className="text-gray-500 text-[10px]">Share your earning journey</p>
+                <p className="text-gray-500 text-[10px]">Share your journey</p>
              </div>
          </div>
          <button onClick={handleUpload} className="px-4 py-2 bg-yellow-600 rounded-lg text-black font-bold text-xs uppercase hover:bg-yellow-500">
@@ -111,8 +199,8 @@ const Profile: React.FC<ProfileProps> = ({ user, onLogout }) => {
 
       {/* Grid Content */}
       <div className="grid grid-cols-3 gap-1">
-         {[1,2,3,4,5,6,7,8,9].map((i) => (
-            <div key={i} className="aspect-square bg-[#111] relative group overflow-hidden cursor-pointer">
+         {[1,2,3,4,5,6].map((i) => (
+            <div key={i} className="aspect-square bg-[#111] relative group overflow-hidden cursor-pointer border border-white/5">
                <div className="absolute inset-0 bg-gradient-to-tr from-gray-900 to-gray-800 opacity-50"></div>
                {activeTab === 'reels' && (
                   <div className="absolute top-2 right-2 text-white drop-shadow-md">
