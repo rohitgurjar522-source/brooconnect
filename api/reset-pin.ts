@@ -10,43 +10,26 @@ const supabase = createClient(
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).end();
 
-  const { mobile, otp, newPin } = req.body;
-
-  if (!mobile || !otp || !newPin) {
-    return res.status(400).json({ success: false, message: "Mobile, OTP, and New PIN are required" });
-  }
+  const { mobile, newPin } = req.body;
+  if (!mobile || !newPin) return res.status(400).json({ success: false, message: "Missing required data" });
 
   const formattedMobile = mobile.startsWith('91') ? mobile : `91${mobile}`;
 
   try {
-    // 1. VERIFY OTP
-    const authKey = process.env.MSG91_AUTH_KEY || process.env.VITE_MSG91_AUTH_KEY;
-    const verifyUrl = `https://api.msg91.com/api/v5/otp/verify?mobile=${formattedMobile}&otp=${otp}`;
-    
-    const otpRes = await fetch(verifyUrl, {
-      method: "POST",
-      headers: { "authkey": authKey as string }
-    });
-    const otpData = await otpRes.json();
-
-    if (otpData.type !== "success") {
-      return res.status(401).json({ success: false, message: "Verification failed: Invalid OTP" });
-    }
-
-    // 2. HASH NEW PIN
     const pinHash = await bcrypt.hash(newPin, 10);
-
-    // 3. UPDATE DB
-    const { error } = await supabase
+    const { data: user, error } = await supabase
       .from('users')
       .update({ pin_hash: pinHash })
-      .eq('mobile', formattedMobile);
+      .eq('mobile', formattedMobile)
+      .select()
+      .single();
 
     if (error) throw error;
 
-    return res.status(200).json({ success: true, message: "Security PIN updated successfully" });
+    const { pin_hash, ...safeUser } = user;
+    return res.status(200).json({ success: true, user: safeUser });
   } catch (err: any) {
-    console.error("Reset PIN Server Error:", err);
-    return res.status(500).json({ success: false, message: "Failed to reset PIN" });
+    console.error("Reset PIN Error:", err);
+    return res.status(500).json({ success: false, message: "Failed to update security PIN" });
   }
 }
