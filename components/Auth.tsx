@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Trophy, Phone, CheckCircle, Smartphone, ShieldCheck, Key, Lock, Mail, User as UserIcon, MapPin } from './Icons';
+import { sendOtp, verifyOtpAndLogin, verifyOtpAndResetPin } from '../lib/authFlow';
 
 type AuthView = "login" | "register" | "otp_verify_reg" | "forgot_pin" | "otp_verify_forgot";
 
@@ -9,7 +10,7 @@ export default function Auth() {
   const [error, setError] = useState("");
   const [timer, setTimer] = useState(0);
 
-  // States
+  // Input states
   const [mobile, setMobile] = useState("");
   const [pin, setPin] = useState("");
   const [otp, setOtp] = useState("");
@@ -29,35 +30,13 @@ export default function Auth() {
     return () => clearInterval(interval);
   }, [timer]);
 
-  const showErr = (msg: string) => {
+  const displayError = (msg: string) => {
     setError(msg);
     setTimeout(() => setError(""), 5000);
   };
 
-  const handleSendOtp = async (num: string) => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile: num })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setTimer(30);
-        return true;
-      }
-      throw new Error(data.message || "OTP delivery failed");
-    } catch (err: any) {
-      showErr(err.message);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const onLogin = async () => {
-    if (mobile.length !== 10 || pin.length < 4) return showErr("Enter 10-digit mobile and 4-6 digit PIN");
+    if (mobile.length !== 10 || pin.length < 4) return displayError("Enter 10-digit mobile and valid PIN");
     setLoading(true);
     try {
       const res = await fetch("/api/login", {
@@ -68,90 +47,85 @@ export default function Auth() {
       const data = await res.json();
       if (data.success) {
         localStorage.setItem('broo_user', JSON.stringify(data.user));
-        window.location.href = "/"; // Force direct redirect
+        window.location.href = "/";
       } else {
-        throw new Error(data.message);
+        throw new Error(data.message || "Invalid login credentials");
       }
     } catch (err: any) {
-      showErr(err.message);
+      displayError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const startReg = async () => {
+  const onRegisterStart = async () => {
     if (!regData.name || mobile.length !== 10 || pin.length < 4) {
-      return showErr("Name, 10-digit Mobile, and 4-6 Digit PIN are required");
+      return displayError("Name, 10-digit mobile, and 4-6 digit PIN required");
     }
-    const ok = await handleSendOtp(mobile);
-    if (ok) setView("otp_verify_reg");
-  };
-
-  const finalizeReg = async () => {
-    if (otp.length !== 6) return showErr("Enter 6-digit OTP code");
     setLoading(true);
     try {
-      // 1. Verify OTP
-      const vRes = await fetch("/api/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile, otp })
-      });
-      const vData = await vRes.json();
-      if (!vData.success) throw new Error(vData.message || "OTP Verification failed");
-
-      // 2. Create Account
-      const cRes = await fetch("/api/create-account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...regData, mobile, pin })
-      });
-      const cData = await cRes.json();
-      if (cData.success) {
-        localStorage.setItem('broo_user', JSON.stringify(cData.user));
-        window.location.href = "/";
+      const data = await sendOtp(mobile);
+      if (data.type === "success") {
+        setTimer(30);
+        setView("otp_verify_reg");
       } else {
-        throw new Error(cData.message || "Failed to finalize account");
+        throw new Error(data.message || "Failed to send OTP");
       }
     } catch (err: any) {
-      showErr(err.message);
+      displayError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const startForgot = async () => {
-    if (mobile.length !== 10) return showErr("Enter registered 10-digit mobile");
-    const ok = await handleSendOtp(mobile);
-    if (ok) setView("otp_verify_forgot");
-  };
-
-  const finalizeForgot = async () => {
-    if (otp.length !== 6 || newPin.length < 4) return showErr("Enter OTP and new 4-6 digit PIN");
+  const onRegisterFinalize = async () => {
+    if (otp.length !== 6) return displayError("Enter 6-digit OTP");
     setLoading(true);
     try {
-      const vRes = await fetch("/api/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile, otp })
-      });
-      const vData = await vRes.json();
-      if (!vData.success) throw new Error(vData.message);
+      await verifyOtpAndLogin(
+        regData.name, 
+        mobile, 
+        regData.age, 
+        regData.city, 
+        pin, 
+        otp, 
+        regData.pincode, 
+        regData.email
+      );
+      // Redirect handled inside verifyOtpAndLogin
+    } catch (err: any) {
+      displayError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const rRes = await fetch("/api/reset-pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile, newPin })
-      });
-      const rData = await rRes.json();
-      if (rData.success) {
-        localStorage.setItem('broo_user', JSON.stringify(rData.user));
-        window.location.href = "/";
+  const onForgotStart = async () => {
+    if (mobile.length !== 10) return displayError("Enter registered mobile number");
+    setLoading(true);
+    try {
+      const data = await sendOtp(mobile);
+      if (data.type === "success") {
+        setTimer(30);
+        setView("otp_verify_forgot");
       } else {
-        throw new Error(rData.message);
+        throw new Error(data.message || "Failed to send OTP");
       }
     } catch (err: any) {
-      showErr(err.message);
+      displayError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onForgotFinalize = async () => {
+    if (otp.length !== 6 || newPin.length < 4) return displayError("Enter OTP and new PIN");
+    setLoading(true);
+    try {
+      await verifyOtpAndResetPin(mobile, otp, newPin);
+      // Redirect handled inside verifyOtpAndResetPin
+    } catch (err: any) {
+      displayError(err.message);
     } finally {
       setLoading(false);
     }
@@ -178,7 +152,7 @@ export default function Auth() {
 
           <div className="space-y-4">
             {error && (
-              <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-xl text-red-500 text-[10px] font-bold text-center uppercase tracking-wider animate-shake">
+              <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-xl text-red-500 text-[10px] font-bold text-center uppercase animate-shake">
                 {error}
               </div>
             )}
@@ -189,9 +163,9 @@ export default function Auth() {
                   <input type="tel" maxLength={10} placeholder="Mobile Number" className="auth-input" value={mobile} onChange={e => setMobile(e.target.value.replace(/\D/g, ''))}/>
                 </InputGroup>
                 <InputGroup icon={<Lock size={18}/>}>
-                  <input type="password" placeholder="4-6 Digit PIN" className="auth-input" value={pin} onChange={e => setPin(e.target.value)}/>
+                  <input type="password" placeholder="PIN Code" className="auth-input" value={pin} onChange={e => setPin(e.target.value)}/>
                 </InputGroup>
-                <button onClick={onLogin} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase tracking-wider active:scale-95 transition-all text-sm shadow-xl shadow-yellow-500/10">
+                <button onClick={onLogin} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase tracking-wider text-sm shadow-xl shadow-yellow-500/10">
                   {loading ? <Spinner/> : "LOG IN TO DASHBOARD"}
                 </button>
                 <div className="flex justify-between px-1">
@@ -220,10 +194,10 @@ export default function Auth() {
                    <input type="email" placeholder="Email (Optional)" className="auth-input" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})}/>
                 </InputGroup>
                 <InputGroup icon={<Lock size={18}/>}>
-                  <input type="password" placeholder="Create Security PIN *" className="auth-input" value={pin} onChange={e => setPin(e.target.value)}/>
+                  <input type="password" placeholder="Set 4-6 Digit PIN *" className="auth-input" value={pin} onChange={e => setPin(e.target.value)}/>
                 </InputGroup>
-                <button onClick={startReg} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
-                  {loading ? <Spinner/> : "SEND VERIFICATION CODE"}
+                <button onClick={onRegisterStart} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
+                  {loading ? <Spinner/> : "CREATE ACCOUNT"}
                 </button>
                 <button onClick={() => setView("login")} className="w-full text-center text-[10px] text-gray-500 font-bold uppercase py-2">Back to Login</button>
               </div>
@@ -233,27 +207,27 @@ export default function Auth() {
               <div className="space-y-6 animate-fade-in text-center">
                 <p className="text-xs text-gray-400">Verifying <span className="text-white font-bold">+91 {mobile}</span></p>
                 <InputGroup icon={<CheckCircle size={18}/>}>
-                  <input type="text" maxLength={6} placeholder="6-Digit OTP" className="auth-input text-center tracking-[0.5em] font-bold text-xl" value={otp} onChange={e => setOtp(e.target.value)}/>
+                  <input type="text" maxLength={6} placeholder="Enter 6-Digit OTP" className="auth-input text-center tracking-[0.5em] font-bold text-xl" value={otp} onChange={e => setOtp(e.target.value)}/>
                 </InputGroup>
                 <div className="flex justify-between items-center px-1">
-                   <button onClick={() => setView("register")} className="text-[10px] text-gray-500 uppercase font-bold">Edit Info</button>
-                   <button onClick={() => handleSendOtp(mobile)} disabled={timer > 0} className={`text-[10px] font-bold uppercase ${timer > 0 ? 'text-gray-700' : 'text-yellow-600'}`}>
+                   <button onClick={() => setView("register")} className="text-[10px] text-gray-500 uppercase font-bold">Edit Profile</button>
+                   <button onClick={() => sendOtp(mobile)} disabled={timer > 0} className={`text-[10px] font-bold uppercase ${timer > 0 ? 'text-gray-700' : 'text-yellow-600'}`}>
                       {timer > 0 ? `Resend in ${timer}s` : "Resend OTP"}
                    </button>
                 </div>
-                <button onClick={finalizeReg} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
-                  {loading ? <Spinner/> : "FINISH REGISTRATION"}
+                <button onClick={onRegisterFinalize} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
+                  {loading ? <Spinner/> : "VERIFY & START"}
                 </button>
               </div>
             )}
 
             {view === "forgot_pin" && (
               <div className="space-y-6 animate-fade-in">
-                <p className="text-[10px] text-gray-500 uppercase text-center tracking-wider leading-relaxed">Identity verification is required to reset your security PIN.</p>
+                <p className="text-[10px] text-gray-500 uppercase text-center tracking-wider leading-relaxed">Identity verification required to reset PIN.</p>
                 <InputGroup icon={<Phone size={18}/>} prefix="+91">
-                  <input type="tel" maxLength={10} placeholder="Mobile Number" className="auth-input" value={mobile} onChange={e => setMobile(e.target.value.replace(/\D/g, ''))}/>
+                  <input type="tel" maxLength={10} placeholder="Registered Mobile" className="auth-input" value={mobile} onChange={e => setMobile(e.target.value.replace(/\D/g, ''))}/>
                 </InputGroup>
-                <button onClick={startForgot} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
+                <button onClick={onForgotStart} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
                   {loading ? <Spinner/> : "SEND OTP"}
                 </button>
                 <button onClick={() => setView("login")} className="w-full text-center text-[10px] text-gray-500 font-bold uppercase">Cancel</button>
@@ -266,10 +240,10 @@ export default function Auth() {
                   <input type="text" maxLength={6} placeholder="Enter OTP" className="auth-input text-center tracking-[0.5em] font-bold" value={otp} onChange={e => setOtp(e.target.value)}/>
                 </InputGroup>
                 <InputGroup icon={<Lock size={18}/>}>
-                  <input type="password" placeholder="Set New PIN" className="auth-input" value={newPin} onChange={e => setNewPin(e.target.value)}/>
+                  <input type="password" placeholder="New PIN Code" className="auth-input" value={newPin} onChange={e => setNewPin(e.target.value)}/>
                 </InputGroup>
-                <button onClick={finalizeForgot} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
-                  {loading ? <Spinner/> : "UPDATE PIN & LOGIN"}
+                <button onClick={onForgotFinalize} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
+                  {loading ? <Spinner/> : "UPDATE PIN & LOG IN"}
                 </button>
               </div>
             )}
@@ -277,9 +251,9 @@ export default function Auth() {
             <div className="pt-6 text-center border-t border-gray-800/50 flex flex-col items-center">
                <div className="flex items-center justify-center gap-2 mb-1">
                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                 <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Gateway Encrypted</span>
+                 <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Gateway Secure</span>
                </div>
-               <p className="text-[8px] text-gray-700 uppercase">BROO-SECURE™ v5.1</p>
+               <p className="text-[8px] text-gray-700 uppercase">BROO-SECURE™ v5.2</p>
             </div>
           </div>
         </div>
