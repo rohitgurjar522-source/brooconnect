@@ -11,7 +11,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).end();
 
   const { mobile, newPin } = req.body;
-  if (!mobile || !newPin) return res.status(400).json({ success: false, message: "Missing required data" });
+  if (!mobile || !newPin) return res.status(400).json({ success: false, message: "Invalid data" });
 
   const formattedMobile = mobile.startsWith('91') ? mobile : `91${mobile}`;
 
@@ -28,8 +28,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { pin_hash, ...safeUser } = user;
     return res.status(200).json({ success: true, user: safeUser });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Reset PIN Error:", err);
-    return res.status(500).json({ success: false, message: "Failed to update security PIN" });
+    return res.status(500).json({ success: false, message: "Failed to reset PIN" });
   }
 }

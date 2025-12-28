@@ -10,26 +10,26 @@ const supabase = createClient(
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).end();
 
-  const { name, phone, age, city, pin, pincode, email } = req.body;
-  if (!name || !phone || !pin) {
-    return res.status(400).json({ success: false, message: "Missing required fields" });
+  const { name, mobile, age, city, pincode, email, pin } = req.body;
+  if (!name || !mobile || !pin) {
+    return res.status(400).json({ success: false, message: "Required fields missing" });
   }
 
-  const formattedPhone = phone.startsWith('91') ? phone : `91${phone}`;
+  const formattedMobile = mobile.startsWith('91') ? mobile : `91${mobile}`;
 
   try {
-    // 1. Hash PIN for security
+    // 1. Hash PIN
     const pinHash = await bcrypt.hash(pin, 10);
 
-    // 2. Generate referral code
+    // 2. Referral Code
     const referralCode = "BR" + Math.floor(1000 + Math.random() * 9000);
 
-    // 3. Insert into database
-    const { data: newUser, error } = await supabase
+    // 3. Database Insertion
+    const { data: user, error } = await supabase
       .from('users')
       .insert([{
-        mobile: formattedPhone,
         full_name: name,
+        mobile: formattedMobile,
         age: parseInt(age) || null,
         city: city || null,
         pincode: pincode || null,
@@ -47,16 +47,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .single();
 
     if (error) {
-      if (error.code === '23505') {
-        return res.status(400).json({ success: false, message: "Mobile number already exists" });
-      }
+      if (error.code === '23505') return res.status(400).json({ success: false, message: "Account already exists" });
       throw error;
     }
 
-    const { pin_hash, ...safeUser } = newUser;
+    const { pin_hash, ...safeUser } = user;
     return res.status(200).json({ success: true, user: safeUser });
   } catch (err: any) {
-    console.error("Create Account Error:", err);
-    return res.status(500).json({ success: false, message: "Database failure" });
+    console.error("Account Creation Error:", err);
+    return res.status(500).json({ success: false, message: "Failed to create account" });
   }
 }

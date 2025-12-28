@@ -22,15 +22,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('mobile', formattedMobile)
       .maybeSingle();
 
-    if (error || !user) return res.status(401).json({ success: false, message: "Invalid mobile or PIN" });
+    if (error || !user) {
+      return res.status(401).json({ success: false, message: "Account not found or invalid PIN" });
+    }
 
-    const match = await bcrypt.compare(pin, user.pin_hash);
-    if (!match) return res.status(401).json({ success: false, message: "Invalid mobile or PIN" });
+    const isMatch = await bcrypt.compare(pin, user.pin_hash);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: "Invalid PIN" });
+    }
 
     const { pin_hash, ...safeUser } = user;
     return res.status(200).json({ success: true, user: safeUser });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Login Error:", err);
-    return res.status(500).json({ success: false, message: "Authentication failure" });
+    return res.status(500).json({ success: false, message: "Authentication failed" });
   }
 }

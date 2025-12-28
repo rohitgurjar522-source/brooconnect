@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Trophy, Phone, CheckCircle, Smartphone, ShieldCheck, Key, Lock, Mail, User as UserIcon, MapPin } from './Icons';
-import { sendOtp, verifyOtpAndLogin, verifyOtpAndResetPin } from '../lib/authFlow';
+import { triggerOtp, verifyAndCreateAccount, verifyAndResetPin } from '../lib/authFlow';
 
 type AuthView = "login" | "register" | "otp_verify_reg" | "forgot_pin" | "otp_verify_forgot";
 
@@ -10,7 +10,7 @@ export default function Auth() {
   const [error, setError] = useState("");
   const [timer, setTimer] = useState(0);
 
-  // Input states
+  // Auth Inputs
   const [mobile, setMobile] = useState("");
   const [pin, setPin] = useState("");
   const [otp, setOtp] = useState("");
@@ -30,13 +30,13 @@ export default function Auth() {
     return () => clearInterval(interval);
   }, [timer]);
 
-  const displayError = (msg: string) => {
+  const displayErr = (msg: string) => {
     setError(msg);
     setTimeout(() => setError(""), 5000);
   };
 
   const onLogin = async () => {
-    if (mobile.length !== 10 || pin.length < 4) return displayError("Enter 10-digit mobile and valid PIN");
+    if (mobile.length !== 10 || pin.length < 4) return displayErr("Enter 10-digit mobile and 4-6 digit PIN");
     setLoading(true);
     try {
       const res = await fetch("/api/login", {
@@ -49,83 +49,66 @@ export default function Auth() {
         localStorage.setItem('broo_user', JSON.stringify(data.user));
         window.location.href = "/";
       } else {
-        throw new Error(data.message || "Invalid login credentials");
+        throw new Error(data.message);
       }
     } catch (err: any) {
-      displayError(err.message);
+      displayErr(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const onRegisterStart = async () => {
-    if (!regData.name || mobile.length !== 10 || pin.length < 4) {
-      return displayError("Name, 10-digit mobile, and 4-6 digit PIN required");
-    }
+  const startSignup = async () => {
+    if (!regData.name || mobile.length !== 10 || pin.length < 4) return displayErr("Name, Mobile and PIN are required");
     setLoading(true);
     try {
-      const data = await sendOtp(mobile);
-      if (data.type === "success") {
+      const data = await triggerOtp(mobile, 'signup');
+      if (data.success) {
         setTimer(30);
         setView("otp_verify_reg");
-      } else {
-        throw new Error(data.message || "Failed to send OTP");
-      }
+      } else throw new Error(data.message);
     } catch (err: any) {
-      displayError(err.message);
+      displayErr(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const onRegisterFinalize = async () => {
-    if (otp.length !== 6) return displayError("Enter 6-digit OTP");
+  const finalizeSignup = async () => {
+    if (otp.length !== 6) return displayErr("Enter 6-digit code");
     setLoading(true);
     try {
-      await verifyOtpAndLogin(
-        regData.name, 
-        mobile, 
-        regData.age, 
-        regData.city, 
-        pin, 
-        otp, 
-        regData.pincode, 
-        regData.email
-      );
-      // Redirect handled inside verifyOtpAndLogin
+      await verifyAndCreateAccount({ ...regData, mobile, pin }, otp);
     } catch (err: any) {
-      displayError(err.message);
+      displayErr(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const onForgotStart = async () => {
-    if (mobile.length !== 10) return displayError("Enter registered mobile number");
+  const startForgot = async () => {
+    if (mobile.length !== 10) return displayErr("Enter 10-digit registered mobile");
     setLoading(true);
     try {
-      const data = await sendOtp(mobile);
-      if (data.type === "success") {
+      const data = await triggerOtp(mobile, 'forgot');
+      if (data.success) {
         setTimer(30);
         setView("otp_verify_forgot");
-      } else {
-        throw new Error(data.message || "Failed to send OTP");
-      }
+      } else throw new Error(data.message);
     } catch (err: any) {
-      displayError(err.message);
+      displayErr(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const onForgotFinalize = async () => {
-    if (otp.length !== 6 || newPin.length < 4) return displayError("Enter OTP and new PIN");
+  const finalizeForgot = async () => {
+    if (otp.length !== 6 || newPin.length < 4) return displayErr("Enter code and new PIN");
     setLoading(true);
     try {
-      await verifyOtpAndResetPin(mobile, otp, newPin);
-      // Redirect handled inside verifyOtpAndResetPin
+      await verifyAndResetPin(mobile, otp, newPin);
     } catch (err: any) {
-      displayError(err.message);
+      displayErr(err.message);
     } finally {
       setLoading(false);
     }
@@ -137,17 +120,17 @@ export default function Auth() {
         <div className="text-center mb-10 animate-fade-in">
           <Trophy size={60} className="text-yellow-500 mx-auto mb-2" />
           <h1 className="text-4xl font-black text-yellow-500 brand-font tracking-tighter uppercase italic">BROO CONNECT</h1>
-          <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.4em] mt-1">Premium Earning Portal</p>
+          <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.4em] mt-1">SECURE EARNING NETWORK</p>
         </div>
 
         <div className="bg-[#111] border border-gray-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-600/5 rounded-full blur-3xl"></div>
           
           <h2 className="text-white text-xl font-black mb-8 text-center uppercase tracking-tight flex items-center justify-center gap-2">
-            {view === "login" && <><ShieldCheck size={20} className="text-yellow-500"/> SYSTEM ACCESS</>}
-            {view === "register" && <><UserIcon size={20} className="text-yellow-500"/> JOIN NETWORK</>}
-            {view.includes("otp") && <><Smartphone size={20} className="text-yellow-500"/> IDENTITY VERIFY</>}
-            {view === "forgot_pin" && <><Key size={20} className="text-yellow-500"/> PIN RECOVERY</>}
+            {view === "login" && <><ShieldCheck size={20} className="text-yellow-500"/> LOGIN</>}
+            {view === "register" && <><UserIcon size={20} className="text-yellow-500"/> SIGNUP</>}
+            {view.includes("otp") && <><Smartphone size={20} className="text-yellow-500"/> VERIFY</>}
+            {view === "forgot_pin" && <><Key size={20} className="text-yellow-500"/> RECOVERY</>}
           </h2>
 
           <div className="space-y-4">
@@ -166,11 +149,11 @@ export default function Auth() {
                   <input type="password" placeholder="PIN Code" className="auth-input" value={pin} onChange={e => setPin(e.target.value)}/>
                 </InputGroup>
                 <button onClick={onLogin} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase tracking-wider text-sm shadow-xl shadow-yellow-500/10">
-                  {loading ? <Spinner/> : "LOG IN TO DASHBOARD"}
+                  {loading ? <Spinner/> : "LOG IN"}
                 </button>
                 <div className="flex justify-between px-1">
                    <button onClick={() => setView("forgot_pin")} className="text-[10px] text-gray-500 font-bold uppercase hover:text-yellow-600">Forgot PIN?</button>
-                   <button onClick={() => setView("register")} className="text-[10px] text-yellow-600 font-bold uppercase hover:text-white">Create Account</button>
+                   <button onClick={() => setView("register")} className="text-[10px] text-yellow-600 font-bold uppercase hover:text-white">Join Now</button>
                 </div>
               </div>
             )}
@@ -190,13 +173,10 @@ export default function Auth() {
                 <InputGroup icon={<MapPin size={18}/>}>
                    <input placeholder="Pincode" className="auth-input" value={regData.pincode} onChange={e => setRegData({...regData, pincode: e.target.value})}/>
                 </InputGroup>
-                <InputGroup icon={<Mail size={18}/>}>
-                   <input type="email" placeholder="Email (Optional)" className="auth-input" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})}/>
-                </InputGroup>
                 <InputGroup icon={<Lock size={18}/>}>
-                  <input type="password" placeholder="Set 4-6 Digit PIN *" className="auth-input" value={pin} onChange={e => setPin(e.target.value)}/>
+                  <input type="password" placeholder="Create 4-6 Digit PIN *" className="auth-input" value={pin} onChange={e => setPin(e.target.value)}/>
                 </InputGroup>
-                <button onClick={onRegisterStart} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
+                <button onClick={startSignup} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
                   {loading ? <Spinner/> : "CREATE ACCOUNT"}
                 </button>
                 <button onClick={() => setView("login")} className="w-full text-center text-[10px] text-gray-500 font-bold uppercase py-2">Back to Login</button>
@@ -207,27 +187,27 @@ export default function Auth() {
               <div className="space-y-6 animate-fade-in text-center">
                 <p className="text-xs text-gray-400">Verifying <span className="text-white font-bold">+91 {mobile}</span></p>
                 <InputGroup icon={<CheckCircle size={18}/>}>
-                  <input type="text" maxLength={6} placeholder="Enter 6-Digit OTP" className="auth-input text-center tracking-[0.5em] font-bold text-xl" value={otp} onChange={e => setOtp(e.target.value)}/>
+                  <input type="text" maxLength={6} placeholder="6-Digit OTP" className="auth-input text-center tracking-[0.5em] font-bold text-xl" value={otp} onChange={e => setOtp(e.target.value)}/>
                 </InputGroup>
                 <div className="flex justify-between items-center px-1">
-                   <button onClick={() => setView("register")} className="text-[10px] text-gray-500 uppercase font-bold">Edit Profile</button>
-                   <button onClick={() => sendOtp(mobile)} disabled={timer > 0} className={`text-[10px] font-bold uppercase ${timer > 0 ? 'text-gray-700' : 'text-yellow-600'}`}>
+                   <button onClick={() => setView("register")} className="text-[10px] text-gray-500 uppercase font-bold">Edit Info</button>
+                   <button onClick={() => triggerOtp(mobile, 'signup')} disabled={timer > 0} className={`text-[10px] font-bold uppercase ${timer > 0 ? 'text-gray-700' : 'text-yellow-600'}`}>
                       {timer > 0 ? `Resend in ${timer}s` : "Resend OTP"}
                    </button>
                 </div>
-                <button onClick={onRegisterFinalize} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
-                  {loading ? <Spinner/> : "VERIFY & START"}
+                <button onClick={finalizeSignup} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
+                  {loading ? <Spinner/> : "VERIFY & FINISH"}
                 </button>
               </div>
             )}
 
             {view === "forgot_pin" && (
               <div className="space-y-6 animate-fade-in">
-                <p className="text-[10px] text-gray-500 uppercase text-center tracking-wider leading-relaxed">Identity verification required to reset PIN.</p>
+                <p className="text-[10px] text-gray-500 uppercase text-center tracking-wider leading-relaxed">Enter registered mobile to recover account.</p>
                 <InputGroup icon={<Phone size={18}/>} prefix="+91">
-                  <input type="tel" maxLength={10} placeholder="Registered Mobile" className="auth-input" value={mobile} onChange={e => setMobile(e.target.value.replace(/\D/g, ''))}/>
+                  <input type="tel" maxLength={10} placeholder="Mobile" className="auth-input" value={mobile} onChange={e => setMobile(e.target.value.replace(/\D/g, ''))}/>
                 </InputGroup>
-                <button onClick={onForgotStart} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
+                <button onClick={startForgot} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
                   {loading ? <Spinner/> : "SEND OTP"}
                 </button>
                 <button onClick={() => setView("login")} className="w-full text-center text-[10px] text-gray-500 font-bold uppercase">Cancel</button>
@@ -242,8 +222,8 @@ export default function Auth() {
                 <InputGroup icon={<Lock size={18}/>}>
                   <input type="password" placeholder="New PIN Code" className="auth-input" value={newPin} onChange={e => setNewPin(e.target.value)}/>
                 </InputGroup>
-                <button onClick={onForgotFinalize} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
-                  {loading ? <Spinner/> : "UPDATE PIN & LOG IN"}
+                <button onClick={finalizeForgot} disabled={loading} className="w-full btn-gaming py-4 rounded-2xl text-black font-black uppercase text-sm">
+                  {loading ? <Spinner/> : "RESET & LOGIN"}
                 </button>
               </div>
             )}
@@ -251,9 +231,9 @@ export default function Auth() {
             <div className="pt-6 text-center border-t border-gray-800/50 flex flex-col items-center">
                <div className="flex items-center justify-center gap-2 mb-1">
                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                 <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Gateway Secure</span>
+                 <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Gateway Verified</span>
                </div>
-               <p className="text-[8px] text-gray-700 uppercase">BROO-SECURE™ v5.2</p>
+               <p className="text-[8px] text-gray-700 uppercase">BROO-SECURE™ v5.3</p>
             </div>
           </div>
         </div>
